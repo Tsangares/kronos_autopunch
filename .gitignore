@@ -6,3 +6,4 @@ __pycache__/
 env/
 last_message.txt
 *.zip
+old/
