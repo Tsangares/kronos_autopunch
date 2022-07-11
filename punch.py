@@ -139,6 +139,9 @@ if __name__=="__main__":
     parser.add_argument('--window', action='store_false', help="Run in windowed mode")
     parser.add_argument('--dry', action='store_true', help="Dry-run; don't actually punch.")
     args = parser.parse_args()
-    driver,waitFor,waitText = punch(args.transfer,clock_in=args.punch_type,dry_run=args.dry,headless=args.window)
-    driver.close()
+    driver = punch(args.transfer,clock_in=args.punch_type,dry_run=args.dry,headless=args.window)
+    try:
+        driver.close()
+    except Exception as e:
+        raise e
 
