@@ -2,6 +2,7 @@ import json, asyncio, os, time, logging
 from functools import partial
 from nio import AsyncClient, MatrixRoom, RoomMessageText
 from punch import punch,diagnostic
+from Kronos import Kronos
 cred = json.load(open('credentials.json'))
 
 DRY_RUN = False
@@ -10,17 +11,17 @@ MATRIX_USER = cred['whitelist']
 MATRIX_SERVER = cred['matrix_server']
 
 
-async def parse_punch(client,transfer,clock_type,duration=0,units=None):
+async def parse_punch(client,kronos,transfer,clock_type,duration=0,units=None):
     print(f"Punching {clock_type} for {duration:.2f} {units}")
     await client.room_send(room_id=ROOM_ID,
                            message_type="m.room.message",
                            content={"msgtype": "m.text", "body": f"Clocking {clock_type}; please accept incoming 2FA!"})
-    response = punch(transfer=transfer,clock_in=clock_type,dry_run=DRY_RUN)
+    response = kronos.clock_in(transfer,persist=True)
     if not isinstance(response,str) and clock_type == 'in':
-        asyncio.create_task(future_punch_out(client,duration,units,transfer))
+        asyncio.create_task(future_punch_out(client,kronos,duration,units,transfer))
     return response
     
-async def future_punch_out(client,duration,units,transfer):
+async def future_punch_out(client,kronos,duration,units,transfer):
     secconds = 0
     if 'hour' in units.lower():
         secconds = duration*60*60
@@ -51,7 +52,7 @@ async def future_punch_out(client,duration,units,transfer):
                                message_type="m.room.message",
                                content={"msgtype": "m.text", "body": message})
         
-        response = punch(transfer=transfer,clock_in='out',dry_run=DRY_RUN)
+        response = kronos.clock_out(persist=True)
         message = ""
         
         if isinstance(response,str):
@@ -63,7 +64,6 @@ async def future_punch_out(client,duration,units,transfer):
         else:
             #success
             clocked_out = True
-            response.close()
             message = "Successful clock out!"
         await client.room_send(room_id=ROOM_ID,
                                message_type="m.room.message",
@@ -71,9 +71,10 @@ async def future_punch_out(client,duration,units,transfer):
 
 
 #DIAGNOSTIC COMMAND
-async def run_diagnostic(client, message):
+async def run_diagnostic(client,kronos, message):
     logging.info("Diagnostic command recieved")
-    response = diagnostic()
+    send_message(client,"Fetching timesheet; incoming 2FA.")
+    response = kronos.diag()
     if isinstance(response,str):
         return {'error': True, 'message': response}
     else:
@@ -84,7 +85,7 @@ async def run_diagnostic(client, message):
 
 #PUNCH IN/OUT COMMAND
 #Punch in defined by four components
-async def run_punch_in(client, message, components):
+async def run_punch_in(client, kronos, message, components):
     logging.info("Possible punch in command recieved")    
     clock_type,duration,units,transfer=components
     try:
@@ -96,17 +97,16 @@ async def run_punch_in(client, message, components):
     duration = float(duration)
     if clock_type == 'in' and ('min' in units or 'hour' in units):
         #SUCCESSFUL COMMAND PARSED
-        response = await parse_punch(client,transfer,clock_type,duration,units)
+        response = await parse_punch(client,kronos,transfer,clock_type,duration,units)
         if isinstance(response,str):
             #Error with kronos/selenium
             return {'error': True, 'message': f'ERROR: {response}'}
         else:
             #Success!
-            response.close()
             return {'error': False, 'message': f'Successfully clocked {clock_type} for {duration} {units} under transfer {transfer}!'}
 
 #Punch out defined by two components
-async def run_punch_out(client, message,components):
+async def run_punch_out(client, kronos,message,components):
     logging.info("Possible punch out command recieved")        
     clock_type,transfer=components
     try:
@@ -117,34 +117,33 @@ async def run_punch_out(client, message,components):
     transfer = int(transfer)
     if clock_type =='out':
         #SUCCESSFUL COMMAND PARSED
-        response = await parse_punch(client,transfer,clock_type)
+        response = await parse_punch(client,kronos,transfer,clock_type)
         if isinstance(response,str):
             #Error with kronos/selenium
             return {'error': True, 'message': response}
         else:
             #Success!
-            response.close()
             return {'error': False, 'message': f'Successfully clocked {clock_type} under transfer {transfer}!'}
 
 #PARSE COMMAND FROM MATRIX
-async def parse_arguments(client,message):
+async def parse_arguments(client,kronos,message):
     ##Diagnostic request
     if message.lower().strip()[:4]=="diag":
-        return await run_diagnostic(client,message)
+        return await run_diagnostic(client,kronos,message)
     
     ##Clocking in/out Request
     components = [m for m in message.lower().replace('clock','').replace('  ',' ').split(' ') if m != '']
     if len(components) == 4:
-        return await run_punch_in(client,message,components)
+        return await run_punch_in(client, kronos,message,components)
     elif len(components)==2:
-        return await run_punch_out(client,message,components)
+        return await run_punch_out(client, krnonos,message,components)
 
     ##Issue with request
     print(components)
     return {'error': True, 'message': 'Bad command: Not correct number of arguments (2/4)'}
             
 
-async def message_callback(client, room: MatrixRoom, event: RoomMessageText) -> None:
+async def message_callback(client,kronos, room: MatrixRoom, event: RoomMessageText) -> None:
     last_time = 0
     if os.path.isfile('last_message.txt'):
         with open('last_message.txt') as f:
@@ -160,17 +159,26 @@ async def message_callback(client, room: MatrixRoom, event: RoomMessageText) -> 
                 str(event.server_timestamp)
             )
             message = event.body
-            resp = await parse_arguments(client,message)
+            resp = await parse_arguments(client,kronos,message)
             await client.room_send(room_id=ROOM_ID,
                              message_type="m.room.message",
                              content={"msgtype": "m.text", "body": resp['message']})
 
+async def send_message(client,message):
+    return await client.room_send(room_id=ROOM_ID,
+                           message_type="m.room.message",
+                           content={"msgtype": "m.text", "body": message})
+    
+            
 async def main() -> None:
     print(f"https://{MATRIX_SERVER}", f"@{cred['matrix_user']}:{MATRIX_SERVER}")
     client = AsyncClient(f"https://{MATRIX_SERVER}", f"@{cred['matrix_user']}:{MATRIX_SERVER}")
-    client.add_event_callback(partial(message_callback,client), RoomMessageText)
+    kronos = Kronos(dry_run=False)
+    kronos.login()
+    client.add_event_callback(partial(message_callback,client,kronos), RoomMessageText)
     print(await client.login(cred['matrix_password']))
-
+    await send_message(client,"Kronos bot started!")
+    
     await client.sync_forever(timeout=30000)  # milliseconds
 
 

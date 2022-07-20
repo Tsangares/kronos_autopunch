@@ -4,7 +4,7 @@ import os,json,logging,time
 logging.basicConfig(level=logging.INFO)
 
 #Beautiful Soup
-from bs4 import BeautifulSoup
+
 
 #import selenium
 from selenium import webdriver
@@ -15,8 +15,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.select import Select
 
 from selenium.webdriver.firefox.options import Options
-
-from functools import partial
 
 
 def punch(transfer=None,clock_in=None,dry_run=True,headless=True,use_config=False,failed=0):
@@ -83,15 +81,18 @@ def punch(transfer=None,clock_in=None,dry_run=True,headless=True,use_config=Fals
                 #Punch In
                 waitText(transfer,tag="a").click()
                 logging.warning("Punching timecard!")
-                time.sleep(0.5)
+                time.sleep(1)
                 waitText("Record Timestamp",tag="button").click()
+                time.sleep(1)                
             else:
                 logging.warning("No transfer, not selecting")
         elif clock_in=="out" and not dry_run:
             #Punch Out
-            time.sleep(0.5)
+            time.sleep(1)
             logging.warning("Punching timecard!")
             waitText("Record Timestamp",tag="button").click()
+            time.sleep(1)
+            
         logging.info("Done.")
     except exceptions.TimeoutException as e:
         logging.error("PUNCH FAILED")
