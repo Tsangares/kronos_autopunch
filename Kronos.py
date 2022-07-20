@@ -22,10 +22,11 @@ class Kronos(FirefoxDriver):
     KRONOS_PRINT_ICON = ".icon-k-print"
     KRONOS_PRINT_CONTAINER = ".printTblWrap"
     
-    def __init__(self,headless=True,dry_run=True,config="config.json"):
+    def __init__(self,headless=True,dry_run=True,persist=False,config="config.json"):
         super().__init__(headless,dry_run)
         self.config=json.load(open(config)) if os.path.isfile(config) else None
         self.logged_in = False
+        self.persist=persist
         if dry_run:
             logging.info("This is a dry run: no punching will occur.")
         
@@ -36,8 +37,6 @@ class Kronos(FirefoxDriver):
     
     #Microsoft & 2FA
     def login(self):
-        self.get(self.entry_url)
-        self.get(self.entry_url)
         self.get(self.entry_url)
         if self.logged_in:
             logging.info("Already logged in!")
@@ -82,7 +81,7 @@ class Kronos(FirefoxDriver):
     def focus_transfer_frame(self):
         try:
             self.switch_to.default_content()            
-            frame = self.waitFor(self.KRONOS_TRANSFER_FRAME)
+            frame = self.waitFor(self.KRONOS_TRANSFER_FRAME,timeout=30)
             self.switch_to.frame(frame)
         except exceptions.TimeoutException as e:
             return self.safeQuit("Kronos: Failed to find transfer frame!")
@@ -113,24 +112,24 @@ class Kronos(FirefoxDriver):
         except exceptions.TimeoutException as e:
             return self.safeQuit("Kronos: Failed to find printout")
             
-    def clock_in(self,transfer,persist=False):
+    def clock_in(self,transfer):
         response = self.login()
         if isinstance(response,str): return response
         response = self.focus_transfer_frame()
         if isinstance(response,str): return response
         response = self.timesheet_select_transfer(transfer)
         if isinstance(response,str): return response
-        if not persist:
+        if not self.persist:
             self.quit()
         
-    def clock_out(self,persist=False):
+    def clock_out(self):
         response = self.login()
         if isinstance(response,str): return response
         response = self.focus_transfer_frame()
         if isinstance(response,str): return response
         response = self.punch()
         if isinstance(response,str): return response
-        if not persist:
+        if not self.persist:
             self.quit()
         
     def diag(self):
@@ -151,7 +150,10 @@ class Kronos(FirefoxDriver):
             container = self.waitFor(self.KRONOS_PRINT_CONTAINER)
             logging.info("DIAG: Parsing")
             html = container.get_attribute('innerHTML')
-            self.quit()
+            self.close()
+            self.switch_to.window(self.window_handles[0])
+            if not self.persist:
+                self.quit()
             soup = BeautifulSoup(html,'html.parser')
             return [[c.text.strip() for c in row.find_all('td') if c.text.strip()!=''] for row in soup.find('tbody').find_all('tr')]
         except exceptions.TimeoutException as e:
@@ -166,8 +168,9 @@ if __name__=="__main__":
     parser.add_argument('--window', action='store_false', help="Run in windowed mode")
     parser.add_argument('--dry', action='store_true', help="Dry-run; don't actually punch.")
     parser.add_argument('--config', type=str, help="Config file location.",default="config.json")
+    parser.add_argument('--persist', action='store_true', help="Keep firefox open")
     args = parser.parse_args()
-    kronos = Kronos(args.window,args.dry,args.config)
+    kronos = Kronos(args.window,args.dry,args.persist,args.config)
     if args.punch_type =="in":
         kronos.clock_in(args.transfer)
     elif args.punch_type =="out":
@@ -176,4 +179,5 @@ if __name__=="__main__":
         #kronos.diag()
         kronos.login()
         kronos.diag()
-    
+        kronos.diag()
+        kronos.diag()

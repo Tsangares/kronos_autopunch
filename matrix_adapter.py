@@ -173,7 +173,7 @@ async def send_message(client,message):
 async def main() -> None:
     print(f"https://{MATRIX_SERVER}", f"@{cred['matrix_user']}:{MATRIX_SERVER}")
     client = AsyncClient(f"https://{MATRIX_SERVER}", f"@{cred['matrix_user']}:{MATRIX_SERVER}")
-    kronos = Kronos(dry_run=False)
+    kronos = Kronos(dry_run=False,persist=True)
     kronos.login()
     client.add_event_callback(partial(message_callback,client,kronos), RoomMessageText)
     print(await client.login(cred['matrix_password']))
