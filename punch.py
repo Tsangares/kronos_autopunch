@@ -17,9 +17,9 @@ from selenium.webdriver.support.select import Select
 from selenium.webdriver.firefox.options import Options
 
 from functools import partial
+import pickle
 
-
-def punch(transfer=None,clock_in=None,dry_run=True,headless=True,use_config=False,failed=0):
+def punch(transfer=None,clock_in=None,dry_run=True,headless=True,use_config=False,failed=0,save=True):
     if clock_in is not None:
         logging.warning(f'Clocking {clock_in}')
     cred = json.load(open('credentials.json'))
@@ -33,14 +33,15 @@ def punch(transfer=None,clock_in=None,dry_run=True,headless=True,use_config=Fals
             dry_run=True
     options = Options()
     if headless:
-        options.add_argument("--headless")        
-    driver = webdriver.Firefox(options=options)
-
+        options.add_argument("--headless")
+    fp = webdriver.FirefoxProfile('profile.txt')
+    driver = webdriver.Firefox(fp,options=options)
+    driver.get("https://cuc.kronos.net")
     def waitFor(key,selector=By.CSS_SELECTOR,parent=driver,delay=10):
         return WebDriverWait(parent,delay).until(EC.visibility_of_element_located((selector,key)))
     def waitText(text,parent=driver,tag='*',delay=5):
         return waitFor(f"//{tag}[contains(., '{text}')]",selector=By.XPATH,parent=parent,delay=delay)
-
+   
     kronos = cred['kronos_entrypoint']
     driver.get(kronos)
     try:
@@ -94,6 +95,7 @@ def punch(transfer=None,clock_in=None,dry_run=True,headless=True,use_config=Fals
             waitText("Record Timestamp",tag="button").click()
         logging.info("Done.")
     except exceptions.TimeoutException as e:
+        print(e)
         logging.error("PUNCH FAILED")
         driver.close()
         return "FAILED_PUNCH"
@@ -119,8 +121,8 @@ def diagnostic(driver=None):
         html = container.get_attribute('innerHTML')
         soup = BeautifulSoup(html,'html.parser')
         driver.close()
-        data = []
         rows = soup.find('tbody').find_all('tr')
+        data = []
         for row in rows:
             cells = [c.text.strip() for c in row.find_all('td') if c.text.strip() != '']
             data.append(cells)
@@ -133,15 +135,18 @@ def diagnostic(driver=None):
 if __name__=="__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Autopunch Kronos based on a transfer and delay')
-    parser.add_argument('punch_type', choices=("in","out"),help="Punch in or punch out?")
-    parser.add_argument('transfer', type=int, help="The tranfer to punch")
+    parser.add_argument('punch_type', choices=("in","out","diag"),help="Punch in or punch out?")
+    parser.add_argument('transfer', type=int, nargs="?",help="The tranfer to punch",default=1)
     parser.add_argument('delay', type=int, nargs="?", help="Hours to clock.",default=1)
     parser.add_argument('--window', action='store_false', help="Run in windowed mode")
     parser.add_argument('--dry', action='store_true', help="Dry-run; don't actually punch.")
     args = parser.parse_args()
-    driver = punch(args.transfer,clock_in=args.punch_type,dry_run=args.dry,headless=args.window)
+    if args.punch_type=="diag":
+        print(diagnostic())
+    else:
+        driver = punch(args.transfer,clock_in=args.punch_type,dry_run=args.dry,headless=args.window)
     try:
         driver.close()
     except Exception as e:
-        raise e
+        pass
 
