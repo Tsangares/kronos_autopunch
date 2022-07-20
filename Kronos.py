@@ -147,7 +147,7 @@ class Kronos(FirefoxDriver):
             logging.info("DIAG: Changing tabs")
             self.switch_to.window(self.window_handles[1])
             logging.info("DIAG: Collecting table")            
-            container = self.waitFor(self.KRONOS_PRINT_CONTAINER)
+            container = self.waitFor(self.KRONOS_PRINT_CONTAINER,timeout=30)
             logging.info("DIAG: Parsing")
             html = container.get_attribute('innerHTML')
             self.close()
