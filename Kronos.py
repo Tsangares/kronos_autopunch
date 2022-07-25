@@ -3,6 +3,7 @@ logging.basicConfig(level=logging.INFO)
 from FirefoxDriver import FirefoxDriver
 import selenium.common.exceptions as exceptions
 from bs4 import BeautifulSoup
+
 class Kronos(FirefoxDriver):
     entry_url = "https://timekeeping.claremont.edu/"
     
@@ -27,9 +28,28 @@ class Kronos(FirefoxDriver):
         self.config=json.load(open(config)) if os.path.isfile(config) else None
         self.logged_in = False
         self.persist=persist
+        self._last_active = time.time()
         if dry_run:
             logging.info("This is a dry run: no punching will occur.")
-        
+      
+    def setActive(self):
+        self.last_modified = time.time()
+    def getLastActive(self):
+        minute = (time.time() - self._last_active)/60
+        return minute
+    def isIdle(self):
+        if getLastActive() >= 30:
+            logging.info("Have been idle longer than 30 min")
+            return True
+        try:
+            logged_out = self.waitText("Logout successful",timeout=1/60)
+            logging.info("At logout screen")
+            return True
+        except exceptions.TimeoutException as e:
+            pass
+        logging.info("Not idle; still logged in.")
+        return False
+    
     def safeQuit(self,error):
         logging.error(error)
         self.quit()
@@ -38,9 +58,11 @@ class Kronos(FirefoxDriver):
     #Microsoft & 2FA
     def login(self):
         self.get(self.entry_url)
-        if self.logged_in:
+        if self.logged_in and not self.isIdle():
             logging.info("Already logged in!")
             return
+        
+        
         try: ##Central Authentication Service
             logging.info("CAS: Selecting CGU")
             self.waitFor(self.CAS_DROPDOWN).click()
