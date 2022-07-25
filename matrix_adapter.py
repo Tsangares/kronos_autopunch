@@ -3,7 +3,7 @@ from functools import partial
 from nio import AsyncClient, MatrixRoom, RoomMessageText
 from punch import punch,diagnostic
 from Kronos import Kronos
-cred = json.load(open('credentials.json'))
+cred = json.load(open('config.json'))
 
 DRY_RUN = False
 ROOM_ID = cred['room_id']
@@ -11,12 +11,15 @@ MATRIX_USER = cred['whitelist']
 MATRIX_SERVER = cred['matrix_server']
 
 
-async def parse_punch(client,kronos,transfer,clock_type,duration=0,units=None):
+async def parse_punch(client,kronos,clock_type,transfer=None,duration=0,units=None):
     print(f"Punching {clock_type} for {duration:.2f} {units}")
     await client.room_send(room_id=ROOM_ID,
                            message_type="m.room.message",
                            content={"msgtype": "m.text", "body": f"Clocking {clock_type}; please accept incoming 2FA!"})
-    response = kronos.clock_in(transfer,persist=True)
+    if clock_type=="in":
+        response = kronos.clock_in(transfer)
+    elif clock_type=="out":
+        response = kronos.clock_out()
     if not isinstance(response,str) and clock_type == 'in':
         asyncio.create_task(future_punch_out(client,kronos,duration,units,transfer))
     return response
@@ -52,7 +55,7 @@ async def future_punch_out(client,kronos,duration,units,transfer):
                                message_type="m.room.message",
                                content={"msgtype": "m.text", "body": message})
         
-        response = kronos.clock_out(persist=True)
+        response = kronos.clock_out()
         message = ""
         
         if isinstance(response,str):
@@ -73,7 +76,7 @@ async def future_punch_out(client,kronos,duration,units,transfer):
 #DIAGNOSTIC COMMAND
 async def run_diagnostic(client,kronos, message):
     logging.info("Diagnostic command recieved")
-    send_message(client,"Fetching timesheet; incoming 2FA.")
+    await send_message(client,"Fetching timesheet; incoming 2FA.")
     response = kronos.diag()
     if isinstance(response,str):
         return {'error': True, 'message': response}
@@ -97,7 +100,7 @@ async def run_punch_in(client, kronos, message, components):
     duration = float(duration)
     if clock_type == 'in' and ('min' in units or 'hour' in units):
         #SUCCESSFUL COMMAND PARSED
-        response = await parse_punch(client,kronos,transfer,clock_type,duration,units)
+        response = await parse_punch(client,kronos,clock_type,transfer,duration,units)
         if isinstance(response,str):
             #Error with kronos/selenium
             return {'error': True, 'message': f'ERROR: {response}'}
@@ -108,22 +111,17 @@ async def run_punch_in(client, kronos, message, components):
 #Punch out defined by two components
 async def run_punch_out(client, kronos,message,components):
     logging.info("Possible punch out command recieved")        
-    clock_type,transfer=components
-    try:
-        int(transfer)
-    except:
-        #FAILED TO MAKE REQUEST
-        return {'error': True, 'message': 'Bad command: Not correct order/types'}
-    transfer = int(transfer)
+    clock_type=components[0]
     if clock_type =='out':
         #SUCCESSFUL COMMAND PARSED
-        response = await parse_punch(client,kronos,transfer,clock_type)
+        response = await parse_punch(client,kronos,clock_type)
         if isinstance(response,str):
             #Error with kronos/selenium
             return {'error': True, 'message': response}
         else:
             #Success!
-            return {'error': False, 'message': f'Successfully clocked {clock_type} under transfer {transfer}!'}
+            return {'error': False, 'message': f'Successfully clocked {clock_type}!'}
+    return {'error': True, 'message': f'Unknown command {components[0]}'}
 
 #PARSE COMMAND FROM MATRIX
 async def parse_arguments(client,kronos,message):
@@ -135,8 +133,8 @@ async def parse_arguments(client,kronos,message):
     components = [m for m in message.lower().replace('clock','').replace('  ',' ').split(' ') if m != '']
     if len(components) == 4:
         return await run_punch_in(client, kronos,message,components)
-    elif len(components)==2:
-        return await run_punch_out(client, krnonos,message,components)
+    elif len(components)==1:
+        return await run_punch_out(client, kronos,message,components)
 
     ##Issue with request
     print(components)
