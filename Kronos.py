@@ -3,7 +3,7 @@ logging.basicConfig(level=logging.INFO)
 from FirefoxDriver import FirefoxDriver
 import selenium.common.exceptions as exceptions
 from bs4 import BeautifulSoup
-
+from urllib3.exceptions import MaxRetryError
 class Kronos(FirefoxDriver):
     entry_url = "https://timekeeping.claremont.edu/"
     
@@ -56,9 +56,27 @@ class Kronos(FirefoxDriver):
         return error
     
     #Microsoft & 2FA
-    def login(self):
-        self.get(self.entry_url)
-        if self.logged_in and not self.isIdle():
+    def login(self,retry=0):
+        try:
+            self.switch_to.window(self.window_handles[0])
+        except MaxRetryError as e:
+            logging.error("FAILED TO SWITCH WINDOWS; Opening new tab!")
+            self.switch_to.new_window('tab')
+        try:
+            self.get(self.entry_url)
+        except MaxRetryError as e:
+            logging.error(f"FAILED TO GET URL; SCREEN SHOT & RETRY #{retry}!")            
+            self.save_screenshot(f"screenshot_{retry}.png")
+            if retry == 3:
+                self.logged_in=False
+                return self.login(retry+1)
+            elif retry >= 3:
+                raise e
+            return self.login(retry+1)
+
+
+        
+        if self.logged_in:
             logging.info("Already logged in!")
             return
         
@@ -143,6 +161,7 @@ class Kronos(FirefoxDriver):
         if isinstance(response,str): return response
         if not self.persist:
             self.quit()
+        logging.info("Finished clocking in.")            
         
     def clock_out(self):
         response = self.login()
@@ -153,6 +172,7 @@ class Kronos(FirefoxDriver):
         if isinstance(response,str): return response
         if not self.persist:
             self.quit()
+        logging.info("Finished clocking out.")
         
     def diag(self):
         response = self.login()
@@ -177,6 +197,7 @@ class Kronos(FirefoxDriver):
             if not self.persist:
                 self.quit()
             soup = BeautifulSoup(html,'html.parser')
+            logging.info("Finished diag.")
             return [[c.text.strip() for c in row.find_all('td') if c.text.strip()!=''] for row in soup.find('tbody').find_all('tr')]
         except exceptions.TimeoutException as e:
             return self.safeQuit("DIAG: Failed to get diagnostics")
@@ -198,8 +219,4 @@ if __name__=="__main__":
     elif args.punch_type =="out":
         kronos.clock_out()
     elif args.punch_type =="diag":
-        #kronos.diag()
-        kronos.login()
-        kronos.diag()
-        kronos.diag()
         kronos.diag()
