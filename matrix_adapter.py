@@ -185,8 +185,11 @@ async def send_message(client,message):
 async def main() -> None:
     print(f"https://{MATRIX_SERVER}", f"@{cred['matrix_user']}:{MATRIX_SERVER}")
     client = AsyncClient(f"https://{MATRIX_SERVER}", f"@{cred['matrix_user']}:{MATRIX_SERVER}")
-    kronos = Kronos(dry_run=False,persist=True)
+    with open('last_message.txt','w+') as f:
+                f.write(str(int(time.time()*1000)))
+    kronos = Kronos(headless=True,dry_run=False,persist=True)
     kronos.login()
+    
     client.add_event_callback(partial(message_callback,client,kronos), RoomMessageText)
     print(await client.login(cred['matrix_password']))
     await send_message(client,"Kronos bot started!")
