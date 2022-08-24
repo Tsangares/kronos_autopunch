@@ -42,11 +42,13 @@ class Kronos(FirefoxDriver):
             self.switch_to.window(self.window_handles[0])
         except MaxRetryError as e:
             logging.error("FAILED TO SWITCH WINDOWS; Opening new tab!")
+            time.sleep(60)
             self.switch_to.new_window('tab')
         try:
             self.get(self.entry_url)
         except MaxRetryError as e:
-            logging.error(f"FAILED TO GET URL; SCREEN SHOT & RETRY #{retry}!")            
+            logging.error(f"FAILED TO GET URL; SCREEN SHOT & RETRY #{retry}!")
+            time.sleep(60)            
             self.save_screenshot(f"screenshot_{retry}.png")
             if retry == 3:
                 self.logged_in=False
