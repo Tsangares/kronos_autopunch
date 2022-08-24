@@ -78,7 +78,7 @@ class Kronos(FirefoxDriver):
                 raise e
             return self.login(retry+1)
         
-        if self.logged_in and not idle:
+        if self.logged_in and not self.isIdle():
             logging.info("Already logged in!")
             return
         
