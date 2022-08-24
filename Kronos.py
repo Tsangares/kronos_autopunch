@@ -23,14 +23,35 @@ class Kronos(FirefoxDriver):
     KRONOS_PRINT_ICON = ".icon-k-print"
     KRONOS_PRINT_CONTAINER = ".printTblWrap"
     
+    ERROR_POPUP = "#message-btns1"
+    
     def __init__(self,headless=True,dry_run=True,persist=False,config="config.json"):
         super().__init__(headless,dry_run)
         self.config=json.load(open(config)) if os.path.isfile(config) else None
         self.logged_in = False
         self.persist=persist
+        self._last_active = time.time()
         if dry_run:
             logging.info("This is a dry run: no punching will occur.")
-        
+      
+    def setActive(self):
+        self.last_modified = time.time()
+    def getLastActive(self):
+        minute = (time.time() - self._last_active)/60
+        return minute
+    def isIdle(self):
+        if self.getLastActive() >= 30:
+            logging.info("Have been idle longer than 30 min")
+            return True
+        try:
+            logged_out = self.waitText("Logout successful",timeout=1/60)
+            logging.info("At logout screen")
+            return True
+        except exceptions.TimeoutException as e:
+            pass
+        logging.info("Not idle; still logged in.")
+        return False
+    
     def safeQuit(self,error):
         logging.error(error)
         self.quit()
@@ -38,6 +59,7 @@ class Kronos(FirefoxDriver):
     
     #Microsoft & 2FA
     def login(self,retry=0):
+<<<<<<< HEAD
         try:
             self.switch_to.window(self.window_handles[0])
         except MaxRetryError as e:
@@ -56,12 +78,11 @@ class Kronos(FirefoxDriver):
             elif retry >= 3:
                 raise e
             return self.login(retry+1)
-
-
         
-        if self.logged_in:
+        if self.logged_in and not idle:
             logging.info("Already logged in!")
             return
+        
         try: ##Central Authentication Service
             logging.info("CAS: Selecting CGU")
             self.waitFor(self.CAS_DROPDOWN).click()
@@ -70,33 +91,34 @@ class Kronos(FirefoxDriver):
         except exceptions.TimeoutException as e:
             return self.safeQuit("CAS: Failed to select school.")
         
-        try: ## Email
-            logging.info("Microsoft: Logging in")            
-            email = self.waitFor(self.MICROSOFT_EMAIL)
-            email.click()
-            email.send_keys(self.config['email'])
-            self.waitFor(self.MICROSOFT_SUBMIT).click()
-            logging.info("Microsoft: Submitted email.")
-        except exceptions.TimeoutException as e:
-            return self.safeQuit("Microsoft: Failed to submit email.")
+        if not self.logged_in:
+            try: ## Email
+                logging.info("Microsoft: Logging in")            
+                email = self.waitFor(self.MICROSOFT_EMAIL)
+                email.click()
+                email.send_keys(self.config['email'])
+                self.waitFor(self.MICROSOFT_SUBMIT).click()
+                logging.info("Microsoft: Submitted email.")
+            except exceptions.TimeoutException as e:
+                return self.safeQuit("Microsoft: Failed to submit email.")
 
-        try: ## Password
-            password = self.waitFor(self.MICROSOFT_PASS)
-            password.click()
-            password.send_keys(self.config['password'])
-            self.waitFor(self.MICROSOFT_SUBMIT).click()
-            logging.info("Microsoft: Submitted password.")
-        except exceptions.TimeoutException as e:
-            return self.safeQuit("Microsoft: Failed to submit password.")
+            try: ## Password
+                password = self.waitFor(self.MICROSOFT_PASS)
+                password.click()
+                password.send_keys(self.config['password'])
+                self.waitFor(self.MICROSOFT_SUBMIT).click()
+                logging.info("Microsoft: Submitted password.")
+            except exceptions.TimeoutException as e:
+                return self.safeQuit("Microsoft: Failed to submit password.")
 
-        try: ## 2FA
-            logging.info("DUO: Waiting for 2FA")
-            self.waitText('Stay signed in?',timeout=60*3)
-            self.waitFor(self.MICROSOFT_SUBMIT).click()
-            self.logged_in=True
-            logging.info("Logged in.")
-        except exceptions.TimeoutException as e:
-            return self.safeQuit("DUO: Failed to recieve 2FA!")
+            try: ## 2FA
+                logging.info("DUO: Waiting for 2FA")
+                self.waitText('Stay signed in?',timeout=60*3)
+                self.waitFor(self.MICROSOFT_SUBMIT).click()
+                self.logged_in=True
+                logging.info("Logged in.")
+            except exceptions.TimeoutException as e:
+                return self.safeQuit("DUO: Failed to recieve 2FA!")
         
     #Kronos interface
     def focus_transfer_frame(self):

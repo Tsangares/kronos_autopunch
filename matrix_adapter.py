@@ -85,6 +85,16 @@ async def run_diagnostic(client,kronos, message):
             message += '; '.join(row)+'\n'
         return {'error': False, 'message': message, 'data': response}
 
+#DIAGNOSTIC COMMAND
+async def check_idle(client,kronos, message):
+    logging.info("Checking if selenium is idle")
+    send_message(client,"Fetching timesheet; incoming 2FA.")
+    idle = kronos.isIdle()
+    if idle:
+        return {'error': False, 'message': "Yes this is idle."}
+    else:
+        return {'error': False, 'message': "No the session is not idle."}
+
 #PUNCH IN/OUT COMMAND
 #Punch in defined by four components
 async def run_punch_in(client, kronos, message, components):
@@ -124,12 +134,16 @@ async def run_punch_out(client, kronos,message,components):
 
 #PARSE COMMAND FROM MATRIX
 async def parse_arguments(client,kronos,message):
-    ##Diagnostic request
+    logging.info("PARSING ARGUMENTS")
+    ##single word request
     if message.lower().strip()[:4]=="diag":
         return await run_diagnostic(client,kronos,message)
+    elif message.lower().strip()[:4]=="idle":
+        return await check_idle(client,kronos,message)
     
     ##Clocking in/out Request
     components = [m for m in message.lower().replace('clock','').replace('  ',' ').split(' ') if m != '']
+    logging.info(f"Components {str(components)}")
     if len(components) == 4:
         return await run_punch_in(client, kronos,message,components)
     elif len(components)==1:
@@ -170,6 +184,7 @@ async def send_message(client,message):
 async def main() -> None:
     print(f"https://{MATRIX_SERVER}", f"@{cred['matrix_user']}:{MATRIX_SERVER}")
     client = AsyncClient(f"https://{MATRIX_SERVER}", f"@{cred['matrix_user']}:{MATRIX_SERVER}")
+    
     kronos = Kronos(headless=False,dry_run=True,persist=True)
     kronos.login()
     with open('last_message.txt','w+') as f:
