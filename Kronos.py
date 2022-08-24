@@ -59,7 +59,6 @@ class Kronos(FirefoxDriver):
     
     #Microsoft & 2FA
     def login(self,retry=0):
-<<<<<<< HEAD
         try:
             self.switch_to.window(self.window_handles[0])
         except MaxRetryError as e:
