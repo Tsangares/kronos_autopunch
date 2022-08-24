@@ -185,7 +185,7 @@ async def main() -> None:
     print(f"https://{MATRIX_SERVER}", f"@{cred['matrix_user']}:{MATRIX_SERVER}")
     client = AsyncClient(f"https://{MATRIX_SERVER}", f"@{cred['matrix_user']}:{MATRIX_SERVER}")
     
-    kronos = Kronos(headless=False,dry_run=True,persist=True)
+    kronos = Kronos(headless=True,dry_run=False,persist=True)
     kronos.login()
     with open('last_message.txt','w+') as f:
         f.write(str(int(time.time()*1000)))
