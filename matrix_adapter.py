@@ -144,7 +144,7 @@ async def parse_arguments(client,kronos,message):
     
     ##Clocking in/out Request
     components = [m for m in message.lower().replace('clock','').replace('  ',' ').split(' ') if m != '']
-    logging.info("Components",str(components))
+    logging.info(f"Components {str(components)}")
     if len(components) == 4:
         return await run_punch_in(client, kronos,message,components)
     elif len(components)==1:
