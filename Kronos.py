@@ -4,6 +4,7 @@ from FirefoxDriver import FirefoxDriver
 import selenium.common.exceptions as exceptions
 from bs4 import BeautifulSoup
 from urllib3.exceptions import MaxRetryError
+
 class Kronos(FirefoxDriver):
     entry_url = "https://timekeeping.claremont.edu/"
     
@@ -77,10 +78,8 @@ class Kronos(FirefoxDriver):
             elif retry >= 3:
                 raise e
             return self.login(retry+1)
-        
-        if self.logged_in and not self.isIdle():
-            logging.info("Already logged in!")
-            return
+
+        #if self.logged_in and not self.isIdle():
         
         try: ##Central Authentication Service
             logging.info("CAS: Selecting CGU")
@@ -88,9 +87,13 @@ class Kronos(FirefoxDriver):
             self.waitFor(self.CAS_DROPDOWN_CGU).click()
             self.waitFor(self.CAS_SUBMIT).click()
         except exceptions.TimeoutException as e:
-            return self.safeQuit("CAS: Failed to select school.")
-        
-        if not self.logged_in:
+            if not self.logged_in:
+                return self.safeQuit("CAS: Failed to select school.")
+
+        if self.logged_in:
+            logging.info("Already logged in!")
+            return
+        else:
             try: ## Email
                 logging.info("Microsoft: Logging in")            
                 email = self.waitFor(self.MICROSOFT_EMAIL)

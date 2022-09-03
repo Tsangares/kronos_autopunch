@@ -14,7 +14,7 @@ async def parse_punch(client,kronos,clock_type,transfer=None,duration=0,units=No
     print(f"Punching {clock_type} for {duration:.2f} {units}")
     await client.room_send(room_id=ROOM_ID,
                            message_type="m.room.message",
-                           content={"msgtype": "m.text", "body": f"Clocking {clock_type}; please accept incoming 2FA!"})
+                           content={"msgtype": "m.text", "body": f"Clocking {clock_type}.."})
     if clock_type=="in":
         response = kronos.clock_in(transfer)
     elif clock_type=="out":
@@ -40,7 +40,7 @@ async def future_punch_out(client,kronos,duration,units,transfer):
                            message_type="m.room.message",
                            content={"msgtype": "m.text", "body": f"Resing for {secconds} secconds before clock-out!"})
     time.sleep(secconds-60)
-    message = f"About to clock out; prepare to confirm 2FA in 60 secconds!"
+    message = f"Clogging out in 60 secconds.."
     await client.room_send(room_id=ROOM_ID,
                            message_type="m.room.message",
                            content={"msgtype": "m.text", "body": message})
@@ -49,7 +49,7 @@ async def future_punch_out(client,kronos,duration,units,transfer):
     counter = 0
     limit = 5
     while counter <= limit and not clocked_out:
-        message = "Clocking out; please accept incoming 2FA!"
+        message = "Clocking out.."
         await client.room_send(room_id=ROOM_ID,
                                message_type="m.room.message",
                                content={"msgtype": "m.text", "body": message})
@@ -75,7 +75,7 @@ async def future_punch_out(client,kronos,duration,units,transfer):
 #DIAGNOSTIC COMMAND
 async def run_diagnostic(client,kronos, message):
     logging.info("Diagnostic command recieved")
-    await send_message(client,"Fetching timesheet; incoming 2FA.")
+    await send_message(client,"Fetching timesheet..")
     response = kronos.diag()
     if isinstance(response,str):
         return {'error': True, 'message': response}
@@ -90,7 +90,7 @@ async def run_diagnostic(client,kronos, message):
 #DIAGNOSTIC COMMAND
 async def check_idle(client,kronos, message):
     logging.info("Checking if selenium is idle")
-    send_message(client,"Fetching timesheet; incoming 2FA.")
+    send_message(client,"Fetching timesheet..")
     idle = kronos.isIdle()
     if idle:
         return {'error': False, 'message': "Yes this is idle."}
@@ -187,14 +187,15 @@ async def main() -> None:
     print(f"https://{MATRIX_SERVER}", f"@{cred['matrix_user']}:{MATRIX_SERVER}")
     client = AsyncClient(f"https://{MATRIX_SERVER}", f"@{cred['matrix_user']}:{MATRIX_SERVER}")
     
+    await send_message(client,"Kronos bot connected. Starting session, please accept incoming 2FA!")        
     kronos = Kronos(headless=True,dry_run=False,persist=True)
     kronos.login()
     with open('last_message.txt','w+') as f:
         f.write(str(int(time.time()*1000)))
-    
+
     client.add_event_callback(partial(message_callback,client,kronos), RoomMessageText)
     print(await client.login(cred['matrix_password']))
-    await send_message(client,"Kronos bot started!")
+    await send_message(client,"Kronos bot initalized; waiting command...")
     
     await client.sync_forever(timeout=30000)  # milliseconds
 
