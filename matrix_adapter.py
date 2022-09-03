@@ -38,7 +38,7 @@ async def future_punch_out(client,kronos,duration,units,transfer):
         
     await client.room_send(room_id=ROOM_ID,
                            message_type="m.room.message",
-                           content={"msgtype": "m.text", "body": f"Resing for {secconds} secconds before clock-out!"})
+                           content={"msgtype": "m.text", "body": f"Resting for {secconds} secconds.."})
     time.sleep(secconds-60)
     message = f"Clogging out in 60 secconds.."
     await client.room_send(room_id=ROOM_ID,
