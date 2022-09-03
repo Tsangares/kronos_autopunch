@@ -83,6 +83,8 @@ async def run_diagnostic(client,kronos, message):
         message = ""
         for row in response:
             message += '; '.join(row)+'\n'
+        with open('last_timesheet.txt','w+') as f:
+            f.write(message)
         return {'error': False, 'message': message, 'data': response}
 
 #DIAGNOSTIC COMMAND
@@ -198,3 +200,4 @@ async def main() -> None:
 
 
 asyncio.run(main())
+

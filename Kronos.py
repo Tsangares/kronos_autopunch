@@ -156,7 +156,8 @@ class Kronos(FirefoxDriver):
             
     def clock_in(self,transfer):
         response = self.login()
-        if isinstance(response,str): return response
+        #If error is CAS, maybe the kronos is already logged in.
+        if isinstance(response,str) and "CAS" not in response: return response
         response = self.focus_transfer_frame()
         if isinstance(response,str): return response
         response = self.timesheet_select_transfer(transfer)
@@ -167,7 +168,8 @@ class Kronos(FirefoxDriver):
         
     def clock_out(self):
         response = self.login()
-        if isinstance(response,str): return response
+        #If error is CAS, maybe the kronos is already logged in.
+        if isinstance(response,str) and "CAS" not in response: return response
         response = self.focus_transfer_frame()
         if isinstance(response,str): return response
         response = self.punch()
@@ -178,7 +180,8 @@ class Kronos(FirefoxDriver):
         
     def diag(self):
         response = self.login()
-        if isinstance(response,str): return response
+        #If error is CAS, maybe the kronos is already logged in.
+        if isinstance(response,str) and "CAS" not in response: return response
         try:
             logging.info("DIAG: Collecting timesheet")
             self.switch_to.default_content()
